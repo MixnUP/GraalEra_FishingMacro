@@ -9,6 +9,18 @@ import random
 import threading
 import time
 from typing import Optional, Tuple
+import os
+import sys
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 class FishingMacro:
     def __init__(self, root):
@@ -447,7 +459,8 @@ class FishingMacro:
         def detect_any_template(screenshot, templates, confidence=0.8):
             for template_file in templates:
                 try:
-                    template = cv2.imread(f'assets/{template_file}')
+                    template_path = resource_path(f'assets/{template_file}')
+                    template = cv2.imread(template_path)
                     if template is None:
                         continue
                         
