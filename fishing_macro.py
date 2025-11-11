@@ -4,6 +4,7 @@ import pyautogui
 import pydirectinput
 import cv2
 import numpy as np
+import platform
 import random
 import threading
 import time
@@ -396,13 +397,22 @@ class FishingMacro:
 
     def _move_opposite(self, facing_direction, opposite_direction):
         """Move one step opposite and immediately return."""
-        pydirectinput.keyDown(opposite_direction)
-        time.sleep(0.15)
-        pydirectinput.keyUp(opposite_direction)
-        
-        pydirectinput.keyDown(facing_direction)
-        time.sleep(0.15)
-        pydirectinput.keyUp(facing_direction)
+        if platform.system() == "Windows":
+            pydirectinput.keyDown(opposite_direction)
+            time.sleep(0.15)
+            pydirectinput.keyUp(opposite_direction)
+            
+            pydirectinput.keyDown(facing_direction)
+            time.sleep(0.15)
+            pydirectinput.keyUp(facing_direction)
+        else:
+            pyautogui.keyDown(opposite_direction)
+            time.sleep(0.15)
+            pyautogui.keyUp(opposite_direction)
+
+            pyautogui.keyDown(facing_direction)
+            time.sleep(0.15)
+            pyautogui.keyUp(facing_direction)
 
     def _move_sideways(self, facing_direction, opposite_direction):
         """Move one step sideways and immediately return."""
@@ -411,13 +421,22 @@ class FishingMacro:
         else:
             side1, side2 = 'up', 'down'
             
-        pydirectinput.keyDown(side1)
-        time.sleep(0.15)
-        pydirectinput.keyUp(side1)
-        
-        pydirectinput.keyDown(side2)
-        time.sleep(0.15)
-        pydirectinput.keyUp(side2)
+        if platform.system() == "Windows":
+            pydirectinput.keyDown(side1)
+            time.sleep(0.15)
+            pydirectinput.keyUp(side1)
+            
+            pydirectinput.keyDown(side2)
+            time.sleep(0.15)
+            pydirectinput.keyUp(side2)
+        else:
+            pyautogui.keyDown(side1)
+            time.sleep(0.15)
+            pyautogui.keyUp(side1)
+            
+            pyautogui.keyDown(side2)
+            time.sleep(0.15)
+            pyautogui.keyUp(side2)
     
     def run_macro(self):
         """Main macro loop."""
