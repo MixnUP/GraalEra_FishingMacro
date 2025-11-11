@@ -4,6 +4,7 @@ import pyautogui
 import pydirectinput
 import cv2
 import numpy as np
+import random
 import threading
 import time
 from typing import Optional, Tuple
@@ -22,8 +23,10 @@ class FishingMacro:
         self.running: bool = False
         self.overlay = None
         self.last_afk_prevent_time: Optional[float] = None # Changed from start_time
-        self.afk_prevention_interval = 8 * 60 # 8 minutes
-        self.timer_var = tk.StringVar(value=f"{self.afk_prevention_interval // 60:02}:00 until next move")
+        self.afk_prevention_interval_min = 7 * 60 # 7 minutes
+        self.afk_prevention_interval_max = 9 * 60 # 9 minutes
+        self.next_afk_time: Optional[float] = None
+        self.timer_var = tk.StringVar(value="--:-- until next move")
         
         # Create minimal UI
         self.create_ui()
@@ -305,7 +308,8 @@ class FishingMacro:
         self.reset_btn.config(state=tk.DISABLED)
         # Reset timer
         self.last_afk_prevent_time = None
-        self.timer_var.set(f"{self.afk_prevention_interval // 60:02}:00 until next move")
+        self.next_afk_time = None
+        self.timer_var.set("--:-- until next move")
 
     def cancel_selection(self, event=None):
         """Cancel the selection process and reset state."""
@@ -324,12 +328,11 @@ class FishingMacro:
 
     def update_timer(self):
         """Update the countdown display for the next AFK prevention move."""
-        if self.running and self.last_afk_prevent_time is not None:
-            elapsed_since_last_afk = time.time() - self.last_afk_prevent_time
-            remaining_seconds = int(self.afk_prevention_interval - elapsed_since_last_afk)
+        if self.running and self.next_afk_time is not None:
+            remaining_seconds = int(self.next_afk_time - time.time())
             
             if remaining_seconds < 0:
-                remaining_seconds = 0 # Should not happen if logic is correct, but for safety
+                remaining_seconds = 0
 
             hours, remainder = divmod(remaining_seconds, 3600)
             minutes, seconds = divmod(remainder, 60)
@@ -352,7 +355,6 @@ class FishingMacro:
         
         # Start timer
         self.last_afk_prevent_time = time.time()
-        self.update_timer()
         
         # Start the macro in a separate thread
         self.macro_thread = threading.Thread(target=self.run_macro, daemon=True)
@@ -368,35 +370,54 @@ class FishingMacro:
         self.last_afk_prevent_time = None
 
     def prevent_afk(self):
-        """Simulate intelligent movement to prevent being flagged as AFK."""
+        """Simulate intelligent, randomized movement to prevent being flagged as AFK."""
         if not self.character_point or not self.click_point:
-            return # Cannot perform action if points are not set
+            return
 
         self.root.after(0, lambda: self.status_var.set("Moving to prevent AFK..."))
 
+        # Determine primary direction and its opposite
         char_x, char_y = self.character_point
         click_x, click_y = self.click_point
-
         delta_x = click_x - char_x
         delta_y = click_y - char_y
 
-        # Determine primary direction and its opposite
         if abs(delta_x) > abs(delta_y): # Horizontal
-            facing_direction = 'right' if delta_x > 0 else 'left'
-            opposite_direction = 'left' if facing_direction == 'right' else 'right'
+            facing_direction = 'right'
+            opposite_direction = 'left'
         else: # Vertical
-            facing_direction = 'down' if delta_y > 0 else 'up'
-            opposite_direction = 'up' if facing_direction == 'down' else 'down'
-            
-        # Perform the movement
-        # Hold the key down for a short duration to simulate a step
+            facing_direction = 'down'
+            opposite_direction = 'up'
+        
+        # Randomly choose a movement pattern
+        move_patterns = [self._move_opposite, self._move_sideways]
+        chosen_move = random.choice(move_patterns)
+        chosen_move(facing_direction, opposite_direction)
+
+    def _move_opposite(self, facing_direction, opposite_direction):
+        """Move one step opposite and immediately return."""
         pydirectinput.keyDown(opposite_direction)
-        time.sleep(0.15) # Hold for 0.15 seconds
+        time.sleep(0.15)
         pydirectinput.keyUp(opposite_direction)
         
         pydirectinput.keyDown(facing_direction)
-        time.sleep(0.2) # Hold for 0.15 seconds
+        time.sleep(0.15)
         pydirectinput.keyUp(facing_direction)
+
+    def _move_sideways(self, facing_direction, opposite_direction):
+        """Move one step sideways and immediately return."""
+        if facing_direction in ['up', 'down']:
+            side1, side2 = 'left', 'right'
+        else:
+            side1, side2 = 'up', 'down'
+            
+        pydirectinput.keyDown(side1)
+        time.sleep(0.15)
+        pydirectinput.keyUp(side1)
+        
+        pydirectinput.keyDown(side2)
+        time.sleep(0.15)
+        pydirectinput.keyUp(side2)
     
     def run_macro(self):
         """Main macro loop."""
@@ -427,15 +448,20 @@ class FishingMacro:
 
         last_action = time.time() # Initialize last_action
         consecutive_bobber_failures = 0 # New counter for consecutive failures
-        self.last_afk_prevent_time = time.time()
-        afk_prevention_interval = self.afk_prevention_interval # Use class member
+        
+        # Set the first random interval and next AFK time
+        afk_check_interval = random.randint(self.afk_prevention_interval_min, self.afk_prevention_interval_max)
+        self.next_afk_time = time.time() + afk_check_interval
+        self.root.after(0, self.update_timer) # Start the UI timer
 
         while self.running:
             try:
                 # --- AFK Prevention Check ---
-                if time.time() - self.last_afk_prevent_time > afk_prevention_interval:
+                if time.time() > self.next_afk_time:
                     self.prevent_afk()
-                    self.last_afk_prevent_time = time.time()
+                    # Set the next random interval and AFK time
+                    afk_check_interval = random.randint(self.afk_prevention_interval_min, self.afk_prevention_interval_max)
+                    self.next_afk_time = time.time() + afk_check_interval
                     # After moving, it's safer to recast
                     self.root.after(0, lambda: self.status_var.set("AFK prevention done. Recasting..."))
                     continue # Skip to the next loop iteration to recast
@@ -460,11 +486,11 @@ class FishingMacro:
 
                 if not bobber_found:
                     consecutive_bobber_failures += 1
-                    self.root.after(0, lambda: self.status_var.set(f"Bobber not detected ({consecutive_bobber_failures}/3). Retrying cast."))
+                    self.root.after(0, lambda: self.status_var.set(f"Bobber not detected ({consecutive_bobber_failures}/3)."))
                     if consecutive_bobber_failures >= 3:
-                        self.root.after(0, lambda: self.status_var.set("3 consecutive failures. Waiting 10s before retrying cast."))
-                        time.sleep(10) # 10-second timeout before retrying cast
-                        consecutive_bobber_failures = 0 # Reset counter after timeout
+                        self.root.after(0, lambda: self.status_var.set("Position Lost! Please Reset."))
+                        self.root.after(0, self.stop_macro) # Stop the macro
+                        break # Exit the main while loop
                     continue # Go back to the beginning of the main while loop to re-cast
                 else:
                     consecutive_bobber_failures = 0 # Reset counter on success
@@ -488,12 +514,12 @@ class FishingMacro:
                         # If no bite, check if bobber is still present
                         if not detect_any_template(screenshot, bobber_present_templates, confidence=0.7): # Lower confidence for presence check
                             consecutive_bobber_failures += 1
-                            self.root.after(0, lambda: self.status_var.set(f"Bobber disappeared ({consecutive_bobber_failures}/3). Re-casting..."))
+                            self.root.after(0, lambda: self.status_var.set(f"Bobber disappeared ({consecutive_bobber_failures}/3)."))
                             bobber_found = False # Bobber is gone, exit inner loop to re-cast
                             if consecutive_bobber_failures >= 3:
-                                self.root.after(0, lambda: self.status_var.set("3 consecutive disappearances. Waiting 10s before re-casting..."))
-                                time.sleep(10) # 10-second timeout before re-casting
-                                consecutive_bobber_failures = 0 # Reset counter after timeout
+                                self.root.after(0, lambda: self.status_var.set("Position Lost! Please Reset."))
+                                self.root.after(0, self.stop_macro) # Stop the macro
+                                break # Exit the main while loop
                             break # Exit inner loop to go back to casting phase
                         else:
                             consecutive_bobber_failures = 0 # Reset counter on success
