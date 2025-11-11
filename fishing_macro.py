@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import pyautogui
+import pydirectinput
 import cv2
 import numpy as np
 import threading
@@ -16,8 +17,13 @@ class FishingMacro:
         # State
         self.region: Optional[Tuple[int, int, int, int]] = None
         self.click_point: Optional[Tuple[int, int]] = None
+        self.character_point: Optional[Tuple[int, int]] = None
+        self.character_marker_id: Optional[int] = None
         self.running: bool = False
         self.overlay = None
+        self.last_afk_prevent_time: Optional[float] = None # Changed from start_time
+        self.afk_prevention_interval = 8 * 60 # 8 minutes
+        self.timer_var = tk.StringVar(value=f"{self.afk_prevention_interval // 60:02}:00 until next move")
         
         # Create minimal UI
         self.create_ui()
@@ -72,6 +78,15 @@ class FishingMacro:
             foreground='blue'
         )
         status.pack(pady=(5, 0))
+
+        # Timer display
+        timer_label = ttk.Label(
+            self.frame,
+            textvariable=self.timer_var,
+            font=('TkDefaultFont', 12, 'bold'),
+            foreground='green'
+        )
+        timer_label.pack(pady=(5, 0))
         
         # Start with region selection
         self.setup_region()
@@ -104,12 +119,14 @@ class FishingMacro:
         self.selection_rect_id = None
         self.click_point = None
         self.click_marker_ids = []
+        self.character_point = None
+        self.character_marker_id = None
         
         # Instructions
         screen_width = self.overlay.winfo_screenwidth()
         self.instruction_text = self.canvas.create_text(
             screen_width // 2, 30,
-            text="1. Drag your mouse to select the fishing area.\n2. Click once inside the selected area to set the bobber's click point.\n3. Press Enter to confirm, or Esc to cancel.",
+            text="1. Drag to select the fishing area.\n2. Left-click to set the bobber's click point.\n3. Right-click to set your character's position.\n4. Press Enter to confirm, or Esc to cancel.",
             fill="white",
             font=('Arial', 12, 'bold'),
             anchor='center',
@@ -119,6 +136,7 @@ class FishingMacro:
         
         # Bind events
         self.canvas.bind('<Button-1>', self.on_click)
+        self.canvas.bind('<Button-3>', self.on_right_click) # Added for character position
         self.canvas.bind('<B1-Motion>', self.on_drag)
         self.canvas.bind('<ButtonRelease-1>', self.on_release)
         self.overlay.bind('<Escape>', self.cancel_selection)
@@ -198,7 +216,33 @@ class FishingMacro:
             )
         ]
         
-        self.status_var.set(f"Click point set at ({x}, {y}). Press Enter to confirm.")
+        self.status_var.set(f"Click point set at ({x}, {y}). Right-click to set character position.")
+
+    def on_right_click(self, event):
+        """Handle right-click for character position selection."""
+        if self.selection_rect_id is not None:
+            self.set_character_point(event.x, event.y)
+
+    def set_character_point(self, x, y):
+        """Set the character's position and update the marker."""
+        self.character_point = (x, y)
+
+        # Clear previous marker
+        if self.character_marker_id:
+            self.canvas.delete(self.character_marker_id)
+
+        # Draw a square marker
+        size = 7
+        self.character_marker_id = self.canvas.create_rectangle(
+            x - size, y - size, x + size, y + size,
+            outline='red',
+            fill='red',
+            stipple='gray25',
+            width=2,
+            tags='character_point'
+        )
+        
+        self.status_var.set(f"Character position set at ({x}, {y}). Press Enter to confirm.")
     
     def confirm_region(self, event=None):
         """Finalize the region and click point selection."""
@@ -208,6 +252,10 @@ class FishingMacro:
             
         if not self.click_point:
             self.status_var.set("Error: Please set a click point within the region.")
+            return
+
+        if not self.character_point:
+            self.status_var.set("Error: Please right-click to set your character's position.")
             return
             
         # Get the final region
@@ -236,6 +284,7 @@ class FishingMacro:
             try:
                 self.canvas.delete('selection')
                 self.canvas.delete('click_point')
+                self.canvas.delete('character_point')
                 self.canvas.delete('instruction')
             except (tk.TclError, AttributeError):
                 pass
@@ -247,11 +296,16 @@ class FishingMacro:
         self.selection_rect_id = None
         self.click_point = None
         self.click_marker_ids = []
+        self.character_point = None
+        self.character_marker_id = None
         self.region = None # Also reset the region
         self.status_var.set("Ready")
         self.start_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.DISABLED)
         self.reset_btn.config(state=tk.DISABLED)
+        # Reset timer
+        self.last_afk_prevent_time = None
+        self.timer_var.set(f"{self.afk_prevention_interval // 60:02}:00 until next move")
 
     def cancel_selection(self, event=None):
         """Cancel the selection process and reset state."""
@@ -267,11 +321,27 @@ class FishingMacro:
             except tk.TclError:
                 pass
             self.overlay = None
+
+    def update_timer(self):
+        """Update the countdown display for the next AFK prevention move."""
+        if self.running and self.last_afk_prevent_time is not None:
+            elapsed_since_last_afk = time.time() - self.last_afk_prevent_time
+            remaining_seconds = int(self.afk_prevention_interval - elapsed_since_last_afk)
+            
+            if remaining_seconds < 0:
+                remaining_seconds = 0 # Should not happen if logic is correct, but for safety
+
+            hours, remainder = divmod(remaining_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            self.timer_var.set(f"{hours:02}:{minutes:02}:{seconds:02} until next move")
+            
+            # Schedule the next update
+            self.root.after(1000, self.update_timer)
     
     def start_macro(self):
         """Start the fishing macro."""
-        if not self.region or not self.click_point:
-            self.status_var.set("Error: Region or click point not set. Please reset and select again.")
+        if not self.region or not self.click_point or not self.character_point:
+            self.status_var.set("Error: All points not set. Please reset and select again.")
             return
             
         self.running = True
@@ -279,6 +349,10 @@ class FishingMacro:
         self.stop_btn.config(state=tk.NORMAL)
         self.reset_btn.config(state=tk.DISABLED)
         self.status_var.set("Running...")
+        
+        # Start timer
+        self.last_afk_prevent_time = time.time()
+        self.update_timer()
         
         # Start the macro in a separate thread
         self.macro_thread = threading.Thread(target=self.run_macro, daemon=True)
@@ -291,6 +365,38 @@ class FishingMacro:
         self.stop_btn.config(state=tk.DISABLED)
         self.reset_btn.config(state=tk.NORMAL)
         self.status_var.set("Stopped")
+        self.last_afk_prevent_time = None
+
+    def prevent_afk(self):
+        """Simulate intelligent movement to prevent being flagged as AFK."""
+        if not self.character_point or not self.click_point:
+            return # Cannot perform action if points are not set
+
+        self.root.after(0, lambda: self.status_var.set("Moving to prevent AFK..."))
+
+        char_x, char_y = self.character_point
+        click_x, click_y = self.click_point
+
+        delta_x = click_x - char_x
+        delta_y = click_y - char_y
+
+        # Determine primary direction and its opposite
+        if abs(delta_x) > abs(delta_y): # Horizontal
+            facing_direction = 'right' if delta_x > 0 else 'left'
+            opposite_direction = 'left' if facing_direction == 'right' else 'right'
+        else: # Vertical
+            facing_direction = 'down' if delta_y > 0 else 'up'
+            opposite_direction = 'up' if facing_direction == 'down' else 'down'
+            
+        # Perform the movement
+        # Hold the key down for a short duration to simulate a step
+        pydirectinput.keyDown(opposite_direction)
+        time.sleep(0.15) # Hold for 0.15 seconds
+        pydirectinput.keyUp(opposite_direction)
+        
+        pydirectinput.keyDown(facing_direction)
+        time.sleep(0.2) # Hold for 0.15 seconds
+        pydirectinput.keyUp(facing_direction)
     
     def run_macro(self):
         """Main macro loop."""
@@ -321,9 +427,19 @@ class FishingMacro:
 
         last_action = time.time() # Initialize last_action
         consecutive_bobber_failures = 0 # New counter for consecutive failures
+        self.last_afk_prevent_time = time.time()
+        afk_prevention_interval = self.afk_prevention_interval # Use class member
 
         while self.running:
             try:
+                # --- AFK Prevention Check ---
+                if time.time() - self.last_afk_prevent_time > afk_prevention_interval:
+                    self.prevent_afk()
+                    self.last_afk_prevent_time = time.time()
+                    # After moving, it's safer to recast
+                    self.root.after(0, lambda: self.status_var.set("AFK prevention done. Recasting..."))
+                    continue # Skip to the next loop iteration to recast
+
                 # --- Phase 1: Cast and wait for bobber to appear ---
                 self.root.after(0, lambda: self.status_var.set("Casting..."))
                 pyautogui.click(*self.click_point) # Cast
