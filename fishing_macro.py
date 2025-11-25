@@ -528,9 +528,27 @@ class FishingMacro:
                     consecutive_bobber_failures += 1
                     self.root.after(0, lambda: self.status_var.set(f"Bobber not detected ({consecutive_bobber_failures}/3)."))
                     if consecutive_bobber_failures >= 3:
-                        self.root.after(0, lambda: self.status_var.set("Position Lost! Please Reset."))
-                        self.root.after(0, self.stop_macro) # Stop the macro
-                        break # Exit the main while loop
+                        # 1. Announce pause and wait 15 seconds
+                        self.root.after(0, lambda: self.status_var.set("Bobber not found. Pausing for 15s..."))
+                        time.sleep(15)
+
+                        # 2. After delay, verify water position
+                        self.root.after(0, lambda: self.status_var.set("Verifying water position..."))
+                        screenshot = pyautogui.screenshot(region=self.region)
+                        screenshot_cv = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+                        water_templates = ['water.png', 'water2.png', 'water3.png']
+
+                        # 3. Check for water
+                        if detect_any_template(screenshot_cv, water_templates, confidence=0.2):
+                            # 4. Water is present, continue the loop
+                            self.root.after(0, lambda: self.status_var.set("Water found. Resuming fishing..."))
+                            consecutive_bobber_failures = 0 # Reset for the retry
+                            continue # Go to next loop iteration
+                        else:
+                            # 5. Water not found, this is a fatal error
+                            self.root.after(0, lambda: self.status_var.set("Position Lost! No water detected."))
+                            self.root.after(0, self.stop_macro)
+                            break # Exit the main while loop
                     continue # Go back to the beginning of the main while loop to re-cast
                 else:
                     consecutive_bobber_failures = 0 # Reset counter on success
@@ -557,9 +575,27 @@ class FishingMacro:
                             self.root.after(0, lambda: self.status_var.set(f"Bobber disappeared ({consecutive_bobber_failures}/3)."))
                             bobber_found = False # Bobber is gone, exit inner loop to re-cast
                             if consecutive_bobber_failures >= 3:
-                                self.root.after(0, lambda: self.status_var.set("Position Lost! Please Reset."))
-                                self.root.after(0, self.stop_macro) # Stop the macro
-                                break # Exit the main while loop
+                                # 1. Announce pause and wait 15 seconds
+                                self.root.after(0, lambda: self.status_var.set("Bobber disappeared. Pausing for 15s..."))
+                                time.sleep(15)
+
+                                # 2. After delay, verify water position
+                                self.root.after(0, lambda: self.status_var.set("Verifying water position..."))
+                                screenshot_after_delay = pyautogui.screenshot(region=self.region)
+                                screenshot_cv = cv2.cvtColor(np.array(screenshot_after_delay), cv2.COLOR_RGB2BGR)
+                                water_templates = ['water.png', 'water2.png', 'water3.png']
+
+                                # 3. Check for water
+                                if detect_any_template(screenshot_cv, water_templates, confidence=0.5):
+                                    # 4. Water is present, continue the loop
+                                    self.root.after(0, lambda: self.status_var.set("Water found. Resuming fishing..."))
+                                    consecutive_bobber_failures = 0 # Reset for the retry
+                                    break # Exit inner loop to go back to casting phase
+                                else:
+                                    # 5. Water not found, this is a fatal error
+                                    self.root.after(0, lambda: self.status_var.set("Position Lost! No water detected."))
+                                    self.root.after(0, self.stop_macro)
+                                    break # Exit the main while loop
                             break # Exit inner loop to go back to casting phase
                         else:
                             consecutive_bobber_failures = 0 # Reset counter on success
