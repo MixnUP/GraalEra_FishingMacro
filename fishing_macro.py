@@ -36,8 +36,8 @@ class FishingMacro:
         self.running: bool = False
         self.overlay = None
         self.last_afk_prevent_time: Optional[float] = None # Changed from start_time
-        self.afk_prevention_interval_min = 7 * 60 # 7 minutes
-        self.afk_prevention_interval_max = 9 * 60 # 9 minutes
+        self.afk_prevention_interval_min = 3 * 60 # 3 minutes
+        self.afk_prevention_interval_max = 5 * 60 # 5 minutes
         self.next_afk_time: Optional[float] = None
         self.timer_var = tk.StringVar(value="--:-- until next move")
         
@@ -405,50 +405,58 @@ class FishingMacro:
         # Randomly choose a movement pattern
         move_patterns = [self._move_opposite, self._move_sideways]
         chosen_move = random.choice(move_patterns)
-        chosen_move(facing_direction, opposite_direction)
+
+        if chosen_move == self._move_sideways:
+            chosen_move(facing_direction)
+        else:
+            chosen_move(facing_direction, opposite_direction)
 
     def _move_opposite(self, facing_direction, opposite_direction):
         """Move one step opposite and immediately return."""
         if platform.system() == "Windows":
             pydirectinput.keyDown(opposite_direction)
-            time.sleep(0.15)
+            time.sleep(0.05)
             pydirectinput.keyUp(opposite_direction)
             
             pydirectinput.keyDown(facing_direction)
-            time.sleep(0.15)
+            time.sleep(0.05)
             pydirectinput.keyUp(facing_direction)
         else:
             pyautogui.keyDown(opposite_direction)
-            time.sleep(0.15)
+            time.sleep(0.05)
             pyautogui.keyUp(opposite_direction)
 
             pyautogui.keyDown(facing_direction)
-            time.sleep(0.15)
+            time.sleep(0.05)
             pyautogui.keyUp(facing_direction)
 
-    def _move_sideways(self, facing_direction, opposite_direction):
-        """Move one step sideways and immediately return."""
+    def _move_sideways(self, facing_direction):
+        """Move one step sideways and immediately return, with randomization."""
         if facing_direction in ['up', 'down']:
-            side1, side2 = 'left', 'right'
+            side_keys = ['left', 'right']
         else:
-            side1, side2 = 'up', 'down'
-            
+            side_keys = ['up', 'down']
+        
+        random.shuffle(side_keys) # Randomize the order of movement
+        side1, side2 = side_keys
+
         if platform.system() == "Windows":
             pydirectinput.keyDown(side1)
-            time.sleep(0.15)
+            time.sleep(0.05)
             pydirectinput.keyUp(side1)
             
             pydirectinput.keyDown(side2)
-            time.sleep(0.15)
+            time.sleep(0.05)
             pydirectinput.keyUp(side2)
         else:
             pyautogui.keyDown(side1)
-            time.sleep(0.15)
+            time.sleep(0.05)
             pyautogui.keyUp(side1)
             
             pyautogui.keyDown(side2)
-            time.sleep(0.15)
+            time.sleep(0.05)
             pyautogui.keyUp(side2)
+
     
     def run_macro(self):
         """Main macro loop."""
