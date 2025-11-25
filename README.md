@@ -60,23 +60,54 @@ This method is for users who want to view or modify the code.
 
 You can package the script into a single executable file using `PyInstaller`.
 
-1.  **Install PyInstaller:**
-    ```sh
-    pip install pyinstaller
-    ```
+### Prerequisites
 
-2.  **Run the Build Command:**
-    - The command is slightly different for Windows and Linux due to path separators.
+1. **Install Required Packages:**
+   ```sh
+   pip install pyinstaller pyautogui pydirectinput opencv-python numpy Pillow mss pynput
+   ```
 
-    - **For Windows:**
-      ```powershell
-      pyinstaller --name FishingMacro --onefile --windowed --add-data "assets;assets" fishing_macro.py
-      ```
+### Building the Executable
 
-    - **For Linux:**
-      ```bash
-      pyinstaller --name FishingMacro --onefile --windowed --add-data "assets:assets" fishing_macro.py
-      ```
+1. **Using the Provided Spec File:**
+   ```sh
+   pyinstaller --clean --noconfirm FishingMacro.spec
+   ```
 
-3.  **Find the File:**
-    - The final executable will be located in the `dist/` folder.
+2. **Alternative: Generate a New Spec File (if needed):**
+   ```sh
+   pyinstaller --name FishingMacro --onefile --windowed --add-data "assets;assets" fishing_macro.py
+   ```
+
+### Troubleshooting
+
+#### Common Issues and Solutions:
+
+1. **Permission Errors:**
+   - Close any running instances of the application
+   - Run the command prompt as Administrator
+   - Temporarily disable your antivirus software
+
+2. **Missing Dependencies:**
+   Ensure all required packages are installed:
+   ```sh
+   pip install -r requirements.txt
+   ```
+
+3. **Build Cleanup:**
+   If you encounter issues, clean the build directories:
+   ```sh
+   # On Windows
+   rmdir /s /q build dist
+   # On Linux/macOS
+   rm -rf build dist
+   ```
+
+### Finding the Executable
+- The final executable will be located in the `dist/` folder.
+- On Windows, look for `FishingMacro/FishingMacro.exe`
+- The application will create a `logs` directory for error logging
+
+### Note for Development
+- The `FishingMacro.spec` file contains all build configurations
+- To modify build settings, edit the spec file and rebuild
