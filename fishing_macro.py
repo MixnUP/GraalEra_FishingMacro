@@ -420,23 +420,25 @@ class FishingMacro:
             chosen_move(facing_direction, opposite_direction)
 
     def _move_opposite(self, facing_direction, opposite_direction):
-        """Move one step opposite and immediately return."""
-        if platform.system() == "Windows":
-            pydirectinput.keyDown(opposite_direction)
-            time.sleep(0.02)
-            pydirectinput.keyUp(opposite_direction)
-            
-            pydirectinput.keyDown(facing_direction)
-            time.sleep(0.02)
-            pydirectinput.keyUp(facing_direction)
-        else:
-            pyautogui.keyDown(opposite_direction)
-            time.sleep(0.02)
-            pyautogui.keyUp(opposite_direction)
+        """Move one step opposite and immediately return, repeating 1-3 times."""
+        repeat_times = random.randint(1, 3)
+        for _ in range(repeat_times):
+            if platform.system() == "Windows":
+                pydirectinput.keyDown(opposite_direction)
+                time.sleep(0.02)
+                pydirectinput.keyUp(opposite_direction)
+                
+                pydirectinput.keyDown(facing_direction)
+                time.sleep(0.02)
+                pydirectinput.keyUp(facing_direction)
+            else:
+                pyautogui.keyDown(opposite_direction)
+                time.sleep(0.02)
+                pyautogui.keyUp(opposite_direction)
 
-            pyautogui.keyDown(facing_direction)
-            time.sleep(0.02)
-            pyautogui.keyUp(facing_direction)
+                pyautogui.keyDown(facing_direction)
+                time.sleep(0.02)
+                pyautogui.keyUp(facing_direction)
 
     def _move_sideways(self, facing_direction):
         """Move one step sideways and immediately return, with randomization."""
