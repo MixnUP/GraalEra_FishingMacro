@@ -395,12 +395,20 @@ class FishingMacro:
         delta_x = click_x - char_x
         delta_y = click_y - char_y
 
-        if abs(delta_x) > abs(delta_y): # Horizontal
-            facing_direction = 'right'
-            opposite_direction = 'left'
-        else: # Vertical
-            facing_direction = 'down'
-            opposite_direction = 'up'
+        if abs(delta_x) > abs(delta_y):  # Horizontal
+            if delta_x > 0:
+                facing_direction = 'right'
+                opposite_direction = 'left'
+            else:
+                facing_direction = 'left'
+                opposite_direction = 'right'
+        else:  # Vertical
+            if delta_y > 0:
+                facing_direction = 'down'
+                opposite_direction = 'up'
+            else:
+                facing_direction = 'up'
+                opposite_direction = 'down'
         
         # Randomly choose a movement pattern
         move_patterns = [self._move_opposite, self._move_sideways]
