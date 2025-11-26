@@ -423,19 +423,19 @@ class FishingMacro:
         """Move one step opposite and immediately return."""
         if platform.system() == "Windows":
             pydirectinput.keyDown(opposite_direction)
-            time.sleep(0.05)
+            time.sleep(0.02)
             pydirectinput.keyUp(opposite_direction)
             
             pydirectinput.keyDown(facing_direction)
-            time.sleep(0.05)
+            time.sleep(0.02)
             pydirectinput.keyUp(facing_direction)
         else:
             pyautogui.keyDown(opposite_direction)
-            time.sleep(0.05)
+            time.sleep(0.02)
             pyautogui.keyUp(opposite_direction)
 
             pyautogui.keyDown(facing_direction)
-            time.sleep(0.05)
+            time.sleep(0.02)
             pyautogui.keyUp(facing_direction)
 
     def _move_sideways(self, facing_direction):
@@ -450,19 +450,19 @@ class FishingMacro:
 
         if platform.system() == "Windows":
             pydirectinput.keyDown(side1)
-            time.sleep(0.05)
+            time.sleep(0.02)
             pydirectinput.keyUp(side1)
             
             pydirectinput.keyDown(side2)
-            time.sleep(0.05)
+            time.sleep(0.02)
             pydirectinput.keyUp(side2)
         else:
             pyautogui.keyDown(side1)
-            time.sleep(0.05)
+            time.sleep(0.02)
             pyautogui.keyUp(side1)
             
             pyautogui.keyDown(side2)
-            time.sleep(0.05)
+            time.sleep(0.02)
             pyautogui.keyUp(side2)
 
     
